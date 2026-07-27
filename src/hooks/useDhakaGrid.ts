@@ -7,15 +7,19 @@ import { Geolocation } from "@capacitor/geolocation";
 export function useDhakaGrid(zoneId: string = "zone-1") {
   const supabase = createClient();
   const [zones, setZones] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
 
   useEffect(() => {
-    // 1. Fetch initial zones
-    const fetchZones = async () => {
-      const { data } = await supabase.from("zones").select("*");
-      if (data) setZones(data);
+    // 1. Fetch initial zones and reports
+    const fetchData = async () => {
+      const { data: zData } = await supabase.from("zones").select("*");
+      if (zData) setZones(zData);
+      
+      const { data: rData } = await supabase.from("reports").select("*").order("created_at", { ascending: false }).limit(1000);
+      if (rData) setReports(rData);
     };
-    fetchZones();
+    fetchData();
 
     // 2. Subscribe to zone changes
     const zonesChannel = supabase
@@ -27,6 +31,17 @@ export function useDhakaGrid(zoneId: string = "zone-1") {
           setZones((current) =>
             current.map((z) => (z.id === (payload.new as any).id ? payload.new : z))
           );
+        }
+      )
+      .subscribe();
+
+    const reportsChannel = supabase
+      .channel("reports-changes")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "reports" },
+        (payload) => {
+          setReports((current) => [payload.new, ...current]);
         }
       )
       .subscribe();
@@ -70,6 +85,7 @@ export function useDhakaGrid(zoneId: string = "zone-1") {
     return () => {
       networkListener.then(l => l.remove());
       supabase.removeChannel(zonesChannel);
+      supabase.removeChannel(reportsChannel);
       supabase.removeChannel(heartbeatChannel);
     };
   }, [supabase, zoneId]);
@@ -95,5 +111,5 @@ export function useDhakaGrid(zoneId: string = "zone-1") {
     });
   };
 
-  return { zones, onlineCount, reportDisruption };
+  return { zones, reports, onlineCount, reportDisruption };
 }

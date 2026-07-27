@@ -1,14 +1,16 @@
 "use client";
 import DynamicMap from "@/components/DynamicMap";
+import MapControls from "@/components/MapControls";
 import { Power, Drop, Fire } from "@phosphor-icons/react/dist/ssr";
 import { useDhakaGrid } from "@/hooks/useDhakaGrid";
 import { useState } from "react";
 
 export default function Home() {
   const UTTARA_ZONE_ID = "b84467e7-a2d8-4897-96dc-d0cfa2554c1f"; // Mock location for MVP
-  const { zones, onlineCount, reportDisruption } = useDhakaGrid(UTTARA_ZONE_ID);
+  const { zones, reports, onlineCount, reportDisruption } = useDhakaGrid(UTTARA_ZONE_ID);
   
   const [reportState, setReportState] = useState<{ water: boolean, gas: boolean }>({ water: false, gas: false });
+  const [filter, setFilter] = useState("All");
 
   const handleReport = async (type: "Water" | "Gas") => {
     await reportDisruption(type);
@@ -23,9 +25,30 @@ export default function Home() {
   };
 
   const myZone = zones.find(z => z.id === UTTARA_ZONE_ID);
+  
+  const filteredZones = zones.map(z => {
+    let derivedStatus = z.current_status;
+    
+    if (filter === "Electricity") {
+      // Electricity uses the heartbeat-derived status from the backend
+      derivedStatus = z.current_status;
+    } else if (filter === "Water" || filter === "Gas") {
+      // For water and gas, calculate based on raw manual reports in the last 6 hours
+      const recentReports = reports.filter(r => r.zone_id === z.id && r.utility_type === filter);
+      if (recentReports.length >= 3) derivedStatus = "Red";
+      else if (recentReports.length >= 1) derivedStatus = "Yellow";
+      else derivedStatus = "Green";
+    }
+
+    return { ...z, current_status: derivedStatus };
+  }).filter(z => {
+    // If the user selects a specific utility filter, they probably only want to see disrupted zones.
+    // If they want to see all zones including Green, we can just return true.
+    return true;
+  });
 
   return (
-    <main className="flex min-h-screen flex-col bg-slate-950 text-slate-50 overflow-hidden">
+    <main className="flex min-h-screen flex-col bg-slate-950 text-slate-50 overflow-hidden relative">
       
       {/* Header */}
       <header className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/80 backdrop-blur-md z-10 absolute top-0 w-full">
@@ -44,8 +67,9 @@ export default function Home() {
 
       {/* Map Container */}
       <div className="flex-1 relative w-full h-full pt-20 pb-40">
+        <MapControls filter={filter} setFilter={setFilter} />
         <div className="absolute inset-0 z-0">
-          <DynamicMap zones={zones} />
+          <DynamicMap zones={filteredZones} />
         </div>
       </div>
 
