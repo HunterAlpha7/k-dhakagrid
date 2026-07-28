@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">k-dhakagrid</string>
-    <string name="title_activity_main">k-dhakagrid</string>
+    <string name="app_name">GridPulse</string>
+    <string name="title_activity_main">GridPulse</string>
     <string name="package_name">com.dhakagrid.app</string>
     <string name="custom_url_scheme">com.dhakagrid.app</string>
 </resources>

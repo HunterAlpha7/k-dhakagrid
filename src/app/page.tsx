@@ -1,12 +1,12 @@
 "use client";
 import DynamicMap from "@/components/DynamicMap";
 import MapControls from "@/components/MapControls";
-import { Power, Drop, Fire, WifiHigh, WifiSlash } from "@phosphor-icons/react/dist/ssr";
+import { Power, Drop, Fire, WifiHigh, WifiSlash, CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import { useDhakaGrid } from "@/hooks/useDhakaGrid";
 import { useState, useEffect } from "react";
 
 export default function Home() {
-  const { reports, onlineCount, reportDisruption, userLocation } = useDhakaGrid();
+  const { reports, onlineCount, reportDisruption, userLocation, requestLocation } = useDhakaGrid();
   
   // Default map location if no user location is available
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number} | null>(null);
@@ -14,10 +14,11 @@ export default function Home() {
   const [filter, setFilter] = useState("All");
   const [isOnline, setIsOnline] = useState(true);
   const [toastMsg, setToastMsg] = useState("");
+  const [isPanelMinimized, setIsPanelMinimized] = useState(false);
 
   useEffect(() => {
     // If we have user location from GPS, use it by default if user hasn't dropped a pin
-    if (userLocation && !selectedLocation) {
+    if (userLocation) {
       setSelectedLocation(userLocation);
     }
   }, [userLocation]);
@@ -43,16 +44,16 @@ export default function Home() {
     if (reportState.water || reportState.gas) {
       let isAlert = false;
       intervalId = setInterval(() => {
-        document.title = isAlert ? "🚨 OUTAGE REPORTED" : "DhakaGrid";
+        document.title = isAlert ? "🚨 OUTAGE REPORTED" : "GridPulse";
         isAlert = !isAlert;
       }, 1000);
     } else {
-      document.title = "DhakaGrid";
+      document.title = "GridPulse";
     }
 
     return () => {
       if (intervalId) clearInterval(intervalId);
-      document.title = "DhakaGrid";
+      document.title = "GridPulse";
     };
   }, [reportState.water, reportState.gas]);
 
@@ -87,16 +88,22 @@ export default function Home() {
       <header className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/80 backdrop-blur-md z-10 absolute top-0 w-full">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            DhakaGrid
+            GridPulse
           </h1>
           <p className="text-xs text-slate-400 font-mono mt-1">Real-Time Utility Tracker</p>
         </div>
-        <div className="text-right flex flex-col items-end">
-        </div>
+        
+        {typeof window !== 'undefined' && !window.hasOwnProperty('Capacitor') && (
+          <a href="/app-debug.apk" download className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-full font-medium transition-colors border border-slate-700 flex items-center gap-1.5 shadow-sm">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16L7 11l1.4-1.4 2.6 2.6V4h2v8.2l2.6-2.6L17 11l-5 5zm-6 4v-2h12v2H6z"/></svg>
+            Get Android App
+          </a>
+        )}
       </header>
 
       {toastMsg && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 px-4 py-2 rounded-full text-sm font-semibold z-50 shadow-lg animate-in slide-in-from-top-4 fade-in duration-300">
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-blue-500/90 text-white px-6 py-3 rounded-full text-sm font-semibold shadow-lg shadow-blue-500/20 z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+          <CheckCircle size={18} weight="fill" />
           {toastMsg}
         </div>
       )}
@@ -113,42 +120,65 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="absolute bottom-0 w-full max-w-md mx-auto left-0 right-0 bg-slate-900 border-t border-slate-800 rounded-t-3xl p-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10">
-        <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-6"></div>
-        <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-1">Report Disruption</h2>
-        <p className="text-xs text-slate-500 mb-4">{userLocation ? 'Using precise GPS location' : (!selectedLocation ? 'Tap map to set pin location' : 'Ready to report at pin location')}</p>
+      <div className="absolute bottom-0 w-full max-w-md mx-auto left-0 right-0 bg-slate-900 border-t border-slate-800 rounded-t-3xl p-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10 transition-all duration-300">
+        {/* Grabber Area */}
+        <div 
+          className="w-full h-8 -mt-4 mb-2 flex items-center justify-center cursor-pointer"
+          onClick={() => setIsPanelMinimized(!isPanelMinimized)}
+        >
+          <div className="w-12 h-1 bg-slate-700 rounded-full"></div>
+        </div>
+        
+        <div className={`transition-all duration-300 overflow-hidden ${isPanelMinimized ? 'h-0 opacity-0' : 'h-auto opacity-100 mb-4'}`}>
+          <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-1">Report Disruption</h2>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500">{userLocation ? 'Using precise GPS location' : (!selectedLocation ? 'Tap map to set pin location' : 'Ready to report at pin location')}</p>
+            {!userLocation && (
+              <button 
+                onClick={() => requestLocation()}
+                className="text-[10px] font-semibold bg-slate-800 text-blue-400 px-3 py-1.5 rounded-full border border-slate-700 active:scale-95 transition-transform whitespace-nowrap"
+              >
+                Locate Me
+              </button>
+            )}
+          </div>
+        </div>
         
         <div className="grid grid-cols-3 gap-4">
           <button 
-            disabled={reportState.water}
+            disabled={reportState.water || !selectedLocation}
             onClick={() => handleReport("Water")}
-            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 transition-all active:scale-95 group"
+            className={`flex flex-col items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700 transition-all active:scale-95 group ${isPanelMinimized ? 'p-3' : 'p-4'}`}
           >
-            <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-              <Drop size={24} weight="fill" />
+            <div className={`rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform ${isPanelMinimized ? 'w-10 h-10' : 'w-12 h-12 mb-3'}`}>
+              <Drop size={isPanelMinimized ? 20 : 24} weight="fill" />
             </div>
-            <span className="text-sm font-semibold text-center">{reportState.water ? "Reported" : "No Water"}</span>
+            {!isPanelMinimized && <span className="text-sm font-semibold text-center">{reportState.water ? "Reported" : "No Water"}</span>}
           </button>
           
           <button 
-            disabled={reportState.gas}
+            disabled={reportState.gas || !selectedLocation}
             onClick={() => handleReport("Gas")}
-            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 transition-all active:scale-95 group"
+            className={`flex flex-col items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700 transition-all active:scale-95 group ${isPanelMinimized ? 'p-3' : 'p-4'}`}
           >
-            <div className="w-12 h-12 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-              <Fire size={24} weight="fill" />
+            <div className={`rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center group-hover:scale-110 transition-transform ${isPanelMinimized ? 'w-10 h-10' : 'w-12 h-12 mb-3'}`}>
+              <Fire size={isPanelMinimized ? 20 : 24} weight="fill" />
             </div>
-            <span className="text-sm font-semibold text-center">{reportState.gas ? "Reported" : "No Gas"}</span>
+            {!isPanelMinimized && <span className="text-sm font-semibold text-center">{reportState.gas ? "Reported" : "No Gas"}</span>}
           </button>
 
-          <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-800/50 border border-slate-800 transition-all">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${isOnline ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-              {isOnline ? <WifiHigh size={24} weight="bold" /> : <WifiSlash size={24} weight="bold" />}
+          <div className={`flex flex-col items-center justify-center rounded-2xl bg-slate-800/50 border border-slate-800 transition-all ${isPanelMinimized ? 'p-3' : 'p-4'}`}>
+            <div className={`rounded-full flex items-center justify-center ${isOnline ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'} ${isPanelMinimized ? 'w-10 h-10' : 'w-12 h-12 mb-3'}`}>
+              {isOnline ? <WifiHigh size={isPanelMinimized ? 20 : 24} weight="bold" /> : <WifiSlash size={isPanelMinimized ? 20 : 24} weight="bold" />}
             </div>
-            <span className="text-sm font-semibold text-center">Power Status</span>
-            <span className={`text-[10px] font-bold mt-1 ${isOnline ? 'text-green-500' : 'text-red-500'}`}>
-              {isOnline ? 'No Outage' : 'Outage Detected'}
-            </span>
+            {!isPanelMinimized && (
+              <>
+                <span className="text-sm font-semibold text-center">Power Status</span>
+                <span className={`text-[10px] font-bold mt-1 ${isOnline ? 'text-green-500' : 'text-red-500'}`}>
+                  {isOnline ? 'No Outage' : 'Outage Detected'}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

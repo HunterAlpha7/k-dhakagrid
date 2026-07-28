@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.dhakagrid.app',
-  appName: 'k-dhakagrid',
+  appName: 'GridPulse',
   webDir: 'out'
 };
 

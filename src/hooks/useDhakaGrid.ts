@@ -63,10 +63,25 @@ export function useDhakaGrid() {
       }
     });
 
+    const requestLocation = async () => {
+      try {
+        let perm = await Geolocation.checkPermissions();
+        if (perm.location !== 'granted') {
+          perm = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] } as any);
+        }
+        if (perm.location === 'granted') {
+          const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        } else {
+          console.warn("Location permission denied");
+        }
+      } catch (e) {
+        console.warn("Could not get initial location", e);
+      }
+    };
+    
     // Try to get user real location once on load
-    Geolocation.getCurrentPosition().then(pos => {
-      setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    }).catch(e => console.warn("Could not get initial location", e));
+    requestLocation();
 
     return () => {
       networkListener.then(l => l.remove());
@@ -74,6 +89,24 @@ export function useDhakaGrid() {
       supabase.removeChannel(heartbeatChannel);
     };
   }, [supabase]);
+
+  const requestLocation = async () => {
+      try {
+        let perm = await Geolocation.checkPermissions();
+        if (perm.location !== 'granted') {
+          perm = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] } as any);
+        }
+        if (perm.location === 'granted') {
+          const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        } else {
+          alert("Location permission was denied. Please enable it in Android Settings -> Apps -> GridPulse -> Permissions.");
+        }
+      } catch (e: any) {
+        alert("Location error: " + (e.message || JSON.stringify(e)));
+        console.warn("Location error", e);
+      }
+  };
 
   const reportDisruption = async (utilityType: "Electricity" | "Water" | "Gas", lat: number, lng: number) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -87,5 +120,5 @@ export function useDhakaGrid() {
     });
   };
 
-  return { reports, onlineCount, reportDisruption, userLocation };
+  return { reports, onlineCount, reportDisruption, userLocation, requestLocation };
 }
