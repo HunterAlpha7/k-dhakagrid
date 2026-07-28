@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/client";
 import { Network } from "@capacitor/network";
 import { Geolocation } from "@capacitor/geolocation";
+import { Capacitor } from "@capacitor/core";
 
 export function useDhakaGrid() {
   const supabase = createClient();
@@ -65,16 +66,18 @@ export function useDhakaGrid() {
 
     const requestLocation = async () => {
       try {
-        let perm = await Geolocation.checkPermissions();
-        if (perm.location !== 'granted') {
-          perm = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] } as any);
+        if (Capacitor.isNativePlatform()) {
+          let perm = await Geolocation.checkPermissions();
+          if (perm.location !== 'granted') {
+            perm = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] } as any);
+          }
+          if (perm.location !== 'granted') {
+            console.warn("Location permission denied");
+            return;
+          }
         }
-        if (perm.location === 'granted') {
-          const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
-          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        } else {
-          console.warn("Location permission denied");
-        }
+        const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       } catch (e) {
         console.warn("Could not get initial location", e);
       }
@@ -92,16 +95,18 @@ export function useDhakaGrid() {
 
   const requestLocation = async () => {
       try {
-        let perm = await Geolocation.checkPermissions();
-        if (perm.location !== 'granted') {
-          perm = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] } as any);
+        if (Capacitor.isNativePlatform()) {
+          let perm = await Geolocation.checkPermissions();
+          if (perm.location !== 'granted') {
+            perm = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] } as any);
+          }
+          if (perm.location !== 'granted') {
+            alert("Location permission was denied. Please enable it in Android Settings -> Apps -> GridPulse -> Permissions.");
+            return;
+          }
         }
-        if (perm.location === 'granted') {
-          const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
-          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        } else {
-          alert("Location permission was denied. Please enable it in Android Settings -> Apps -> GridPulse -> Permissions.");
-        }
+        const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       } catch (e: any) {
         alert("Location error: " + (e.message || JSON.stringify(e)));
         console.warn("Location error", e);
