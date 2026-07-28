@@ -1,83 +1,122 @@
 "use client";
 import DynamicMap from "@/components/DynamicMap";
 import MapControls from "@/components/MapControls";
-import { Power, Drop, Fire } from "@phosphor-icons/react/dist/ssr";
+import { Power, Drop, Fire, WifiHigh, WifiSlash } from "@phosphor-icons/react/dist/ssr";
 import { useDhakaGrid } from "@/hooks/useDhakaGrid";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Home() {
-  const UTTARA_ZONE_ID = "b84467e7-a2d8-4897-96dc-d0cfa2554c1f"; // Mock location for MVP
-  const { zones, reports, onlineCount, reportDisruption } = useDhakaGrid(UTTARA_ZONE_ID);
+  const { reports, onlineCount, reportDisruption, userLocation } = useDhakaGrid();
   
+  // Default map location if no user location is available
+  const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number} | null>(null);
   const [reportState, setReportState] = useState<{ water: boolean, gas: boolean }>({ water: false, gas: false });
   const [filter, setFilter] = useState("All");
+  const [isOnline, setIsOnline] = useState(true);
+  const [toastMsg, setToastMsg] = useState("");
+
+  useEffect(() => {
+    // If we have user location from GPS, use it by default if user hasn't dropped a pin
+    if (userLocation && !selectedLocation) {
+      setSelectedLocation(userLocation);
+    }
+  }, [userLocation]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsOnline(navigator.onLine);
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    let intervalId: NodeJS.Timeout;
+    if (reportState.water || reportState.gas) {
+      let isAlert = false;
+      intervalId = setInterval(() => {
+        document.title = isAlert ? "🚨 OUTAGE REPORTED" : "DhakaGrid";
+        isAlert = !isAlert;
+      }, 1000);
+    } else {
+      document.title = "DhakaGrid";
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      document.title = "DhakaGrid";
+    };
+  }, [reportState.water, reportState.gas]);
 
   const handleReport = async (type: "Water" | "Gas") => {
-    await reportDisruption(type);
+    if (!selectedLocation) {
+      setToastMsg("Please drop a pin on the map first!");
+      setTimeout(() => setToastMsg(""), 4000);
+      return;
+    }
+
+    await reportDisruption(type, selectedLocation.lat, selectedLocation.lng);
+    
     if (type === "Water") setReportState(s => ({ ...s, water: true }));
     if (type === "Gas") setReportState(s => ({ ...s, gas: true }));
     
-    // Simulate debounce UI
+    setToastMsg(`Reported ${type} outage at your pinned location.`);
+    setTimeout(() => setToastMsg(""), 4000);
+
     setTimeout(() => {
       if (type === "Water") setReportState(s => ({ ...s, water: false }));
       if (type === "Gas") setReportState(s => ({ ...s, gas: false }));
     }, 30000);
   };
 
-  const myZone = zones.find(z => z.id === UTTARA_ZONE_ID);
-  
-  const filteredZones = zones.map(z => {
-    let derivedStatus = z.current_status;
-    
-    if (filter === "Electricity") {
-      // Electricity uses the heartbeat-derived status from the backend
-      derivedStatus = z.current_status;
-    } else if (filter === "Water" || filter === "Gas") {
-      // For water and gas, calculate based on raw manual reports in the last 6 hours
-      const recentReports = reports.filter(r => r.zone_id === z.id && r.utility_type === filter);
-      if (recentReports.length >= 3) derivedStatus = "Red";
-      else if (recentReports.length >= 1) derivedStatus = "Yellow";
-      else derivedStatus = "Green";
-    }
-
-    return { ...z, current_status: derivedStatus };
-  }).filter(z => {
-    // If the user selects a specific utility filter, they probably only want to see disrupted zones.
-    // If they want to see all zones including Green, we can just return true.
-    return true;
+  const filteredReports = reports.filter(r => {
+    if (filter === "All") return true;
+    return r.utility_type === filter;
   });
 
   return (
     <main className="flex min-h-screen flex-col bg-slate-950 text-slate-50 overflow-hidden relative">
-      
-      {/* Header */}
       <header className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/80 backdrop-blur-md z-10 absolute top-0 w-full">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
             DhakaGrid
           </h1>
           <p className="text-xs text-slate-400 font-mono mt-1">Real-Time Utility Tracker</p>
         </div>
-        <div className="text-right">
-          <div className="text-sm font-semibold">{myZone?.zone_name || "Uttara"}</div>
-          <div className="text-xs text-green-400">{onlineCount} Grid Devices Online</div>
+        <div className="text-right flex flex-col items-end">
         </div>
       </header>
 
-      {/* Map Container */}
+      {toastMsg && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 px-4 py-2 rounded-full text-sm font-semibold z-50 shadow-lg animate-in slide-in-from-top-4 fade-in duration-300">
+          {toastMsg}
+        </div>
+      )}
+
       <div className="flex-1 relative w-full h-full pt-20 pb-40">
         <MapControls filter={filter} setFilter={setFilter} />
         <div className="absolute inset-0 z-0">
-          <DynamicMap zones={filteredZones} />
+          <DynamicMap 
+            reports={filteredReports} 
+            selectedLocation={selectedLocation} 
+            setSelectedLocation={setSelectedLocation}
+            allowManualPin={!userLocation}
+          />
         </div>
       </div>
 
-      {/* Bottom Action Sheet */}
-      <div className="absolute bottom-0 w-full bg-slate-900 border-t border-slate-800 rounded-t-3xl p-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10">
+      <div className="absolute bottom-0 w-full max-w-md mx-auto left-0 right-0 bg-slate-900 border-t border-slate-800 rounded-t-3xl p-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10">
         <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-6"></div>
-        
-        <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-4">Report Disruption</h2>
+        <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-1">Report Disruption</h2>
+        <p className="text-xs text-slate-500 mb-4">{userLocation ? 'Using precise GPS location' : (!selectedLocation ? 'Tap map to set pin location' : 'Ready to report at pin location')}</p>
         
         <div className="grid grid-cols-3 gap-4">
           <button 
@@ -88,7 +127,7 @@ export default function Home() {
             <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
               <Drop size={24} weight="fill" />
             </div>
-            <span className="text-sm font-semibold">{reportState.water ? "Reported" : "No Water"}</span>
+            <span className="text-sm font-semibold text-center">{reportState.water ? "Reported" : "No Water"}</span>
           </button>
           
           <button 
@@ -99,17 +138,16 @@ export default function Home() {
             <div className="w-12 h-12 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
               <Fire size={24} weight="fill" />
             </div>
-            <span className="text-sm font-semibold">{reportState.gas ? "Reported" : "No Gas"}</span>
+            <span className="text-sm font-semibold text-center">{reportState.gas ? "Reported" : "No Gas"}</span>
           </button>
 
-          <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-800/50 border border-slate-800 opacity-60">
-            <div className="w-12 h-12 rounded-full bg-yellow-500/10 text-yellow-500 flex items-center justify-center mb-3">
-              <Power size={24} weight="fill" />
+          <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-800/50 border border-slate-800 transition-all">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${isOnline ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+              {isOnline ? <WifiHigh size={24} weight="bold" /> : <WifiSlash size={24} weight="bold" />}
             </div>
-            <span className="text-sm font-semibold">Auto Power</span>
-            <span className="text-[10px] text-slate-500 mt-1 flex flex-col items-center">
-              <span>Dead Man's Switch</span>
-              <span className="text-green-500 font-bold mt-1">ACTIVE</span>
+            <span className="text-sm font-semibold text-center">Power Status</span>
+            <span className={`text-[10px] font-bold mt-1 ${isOnline ? 'text-green-500' : 'text-red-500'}`}>
+              {isOnline ? 'No Outage' : 'Outage Detected'}
             </span>
           </div>
         </div>

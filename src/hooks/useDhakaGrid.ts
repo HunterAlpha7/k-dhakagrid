@@ -4,36 +4,18 @@ import { createClient } from "@/lib/client";
 import { Network } from "@capacitor/network";
 import { Geolocation } from "@capacitor/geolocation";
 
-export function useDhakaGrid(zoneId: string = "zone-1") {
+export function useDhakaGrid() {
   const supabase = createClient();
-  const [zones, setZones] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
 
   useEffect(() => {
-    // 1. Fetch initial zones and reports
     const fetchData = async () => {
-      const { data: zData } = await supabase.from("zones").select("*");
-      if (zData) setZones(zData);
-      
       const { data: rData } = await supabase.from("reports").select("*").order("created_at", { ascending: false }).limit(1000);
       if (rData) setReports(rData);
     };
     fetchData();
-
-    // 2. Subscribe to zone changes
-    const zonesChannel = supabase
-      .channel("zones-db-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "zones" },
-        (payload) => {
-          setZones((current) =>
-            current.map((z) => (z.id === (payload.new as any).id ? payload.new : z))
-          );
-        }
-      )
-      .subscribe();
 
     const reportsChannel = supabase
       .channel("reports-changes")
@@ -46,11 +28,11 @@ export function useDhakaGrid(zoneId: string = "zone-1") {
       )
       .subscribe();
 
-    // 3. Presence Heartbeat (Dead Man's Switch)
+    // Heartbeat channel: global online presence
     const heartbeatChannel = supabase.channel("heartbeat", {
       config: {
         presence: {
-          key: zoneId,
+          key: "global",
         },
       },
     });
@@ -67,49 +49,43 @@ export function useDhakaGrid(zoneId: string = "zone-1") {
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           const netStatus = await Network.getStatus();
-          // PRD: Ensure heartbeat happens strictly over Wi-Fi
           if (netStatus.connectionType === "wifi" || netStatus.connectionType === "unknown") {
-            await heartbeatChannel.track({ online_at: new Date().toISOString(), zone_id: zoneId });
+            await heartbeatChannel.track({ online_at: new Date().toISOString() });
           }
         }
       });
 
     const networkListener = Network.addListener("networkStatusChange", async (status) => {
       if (status.connectionType === "wifi") {
-        await heartbeatChannel.track({ online_at: new Date().toISOString(), zone_id: zoneId });
+        await heartbeatChannel.track({ online_at: new Date().toISOString() });
       } else {
         await heartbeatChannel.untrack();
       }
     });
 
+    // Try to get user real location once on load
+    Geolocation.getCurrentPosition().then(pos => {
+      setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    }).catch(e => console.warn("Could not get initial location", e));
+
     return () => {
       networkListener.then(l => l.remove());
-      supabase.removeChannel(zonesChannel);
       supabase.removeChannel(reportsChannel);
       supabase.removeChannel(heartbeatChannel);
     };
-  }, [supabase, zoneId]);
+  }, [supabase]);
 
-  const reportDisruption = async (utilityType: "Electricity" | "Water" | "Gas") => {
+  const reportDisruption = async (utilityType: "Electricity" | "Water" | "Gas", lat: number, lng: number) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
 
-    // PRD: Intercept @capacitor/geolocation to prevent GPS Spoofing
-    try {
-      const position = await Geolocation.getCurrentPosition();
-      // In a real native Capacitor plugin we'd check isFromMockProvider.
-      // For MVP we just fetch the location to ensure they grant permission.
-      console.log("Location for report:", position.coords);
-    } catch (e) {
-      console.warn("Could not get location", e);
-    }
-
     await supabase.from("reports").insert({
-      zone_id: zoneId,
+      lat,
+      lng,
       utility_type: utilityType,
       reporter_id: session.user.id,
     });
   };
 
-  return { zones, reports, onlineCount, reportDisruption };
+  return { reports, onlineCount, reportDisruption, userLocation };
 }
