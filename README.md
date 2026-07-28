@@ -1,11 +1,11 @@
 <div align="center">
-  <h1>⚡ DhakaGrid</h1>
+  <h1>⚡ GridPulse</h1>
   <p><strong>Real-Time Utility Disruption Tracker for Dhaka, Bangladesh</strong></p>
 </div>
 
 ---
 
-DhakaGrid is a hybrid web and Android application designed to crowdsource and automatically detect utility disruptions (Electricity, Water, and Gas) across the dense urban environment of Dhaka.
+GridPulse is a hybrid web and Android application designed to crowdsource and automatically detect utility disruptions (Electricity, Water, and Gas) across the dense urban environment of Dhaka.
 
 ## ✨ Key Features
 
@@ -37,11 +37,13 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## 📖 Documentation
 
-For a detailed explanation of the architecture, user flows, and a complete user manual (Available in **English** and **Bengali**), please read the [dhakagrid_documentation.md](./dhakagrid_documentation.md) file.
+For a detailed explanation of the architecture, user flows, and a complete user manual (Available in **English** and **Bengali**), please read the [GridPulse.md](./GridPulse.md) file.
 
 ## 👥 Team GridPulse
+
 Developed by:
-- **Seyam Bin H Rahman** (U177)
-- **Muhammad Al-Efad** (U147)
+
+* **Seyam Bin H Rahman** (U177)
+* **Muhammad Al-Efad** (U147)
 
 *Batch-1*
