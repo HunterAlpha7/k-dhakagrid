@@ -16,6 +16,7 @@ export default function Home() {
   const [toastMsg, setToastMsg] = useState("");
   const [isPanelMinimized, setIsPanelMinimized] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [isWeb, setIsWeb] = useState(false);
 
   useEffect(() => {
     // If we have user location from GPS, use it by default if user hasn't dropped a pin
@@ -26,6 +27,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      setIsWeb(!(window as any).Capacitor);
       setIsOnline(navigator.onLine);
       const handleOnline = () => setIsOnline(true);
       const handleOffline = () => setIsOnline(false);
@@ -95,7 +97,7 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-2">
-          {typeof window !== 'undefined' && !window.hasOwnProperty('Capacitor') && (
+          {isWeb && (
             <a href="/app-debug.apk" download className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-full font-medium transition-colors border border-slate-700 flex items-center gap-1.5 shadow-sm">
               <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16L7 11l1.4-1.4 2.6 2.6V4h2v8.2l2.6-2.6L17 11l-5 5zm-6 4v-2h12v2H6z" /></svg>
               Get Android App
