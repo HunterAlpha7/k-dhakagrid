@@ -4,6 +4,7 @@ import MapControls from "@/components/MapControls";
 import { Power, Drop, Fire, WifiHigh, WifiSlash, CheckCircle, Info, Users, X } from "@phosphor-icons/react/dist/ssr";
 import { useDhakaGrid } from "@/hooks/useDhakaGrid";
 import { useState, useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 
 export default function Home() {
   const { reports, onlineCount, reportDisruption, userLocation, requestLocation } = useDhakaGrid();
@@ -27,7 +28,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setIsWeb(!(window as any).Capacitor);
+      setIsWeb(!Capacitor.isNativePlatform());
       setIsOnline(navigator.onLine);
       const handleOnline = () => setIsOnline(true);
       const handleOffline = () => setIsOnline(false);
